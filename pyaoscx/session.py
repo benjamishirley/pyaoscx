@@ -359,7 +359,7 @@ class Session:
         if operation not in operations:
             raise VerificationError(
                 "The operation {0} is not supported."
-                " Use any of {1}".format(operation, list(operations.keys))
+                " Use any of {1}".format(operation, list(operations.keys()))
             )
 
         return operations[operation](

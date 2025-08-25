@@ -2439,47 +2439,95 @@ class Interface(PyaoscxModule):
     # -------------------------------
     # Port-Access Auth (mac-auth / dot1x)
     # -------------------------------
+
+    def _ensure_port_access_auth_method(self, method: str, verify=None) -> bool:
+        """
+        Ensure /port_access_auth_configurations/{method} exists.
+
+        Flow:
+        1) GET /port_access_auth_configurations
+            - if it contains the method key, we're done.
+        2) POST /port_access_auth_configurations {"authentication_method": method}
+            - expect 201 Created (or any 2xx).
+            - Some releases return 500 if it already exists; in that
+            case, do a follow-up GET and accept success if the method key is present.
+        """
+        if method not in ("mac-auth", "dot1x"):
+            raise ParameterError("method must be 'mac-auth' or 'dot1x'")
+
+        list_path = f"system/interfaces/{quote_plus(self.name)}/port_access_auth_configurations"
+
+        # Step 1: check if subresource already exists
+        resp = self.session.request("GET", list_path,
+                                    verify=self.session.s.verify if verify is None else verify)
+        if 200 <= resp.status_code < 300:
+            try:
+                data = json.loads(resp.text) if resp.text else {}
+            except Exception:
+                data = {}
+            if method in data:
+                return True
+
+        # Step 2: create subresource if missing
+        create_body = {"authentication_method": method}
+        resp2 = self.session.request("POST", list_path,
+                                    data=json.dumps(create_body),
+                                    verify=self.session.s.verify if verify is None else verify)
+
+        if resp2.status_code == 201 or (200 <= resp2.status_code < 300):
+            return True
+
+        # Some firmware returns 500 if the method already exists → re-check
+        if resp2.status_code == 500:
+            resp3 = self.session.request("GET", list_path,
+                                        verify=self.session.s.verify if verify is None else verify)
+            if 200 <= resp3.status_code < 300:
+                try:
+                    data3 = json.loads(resp3.text) if resp3.text else {}
+                except Exception:
+                    data3 = {}
+                if method in data3:
+                    return True
+
+        return False
+
+
     def set_port_access_auth_config(
         self,
         authentication_method: str,
         *,
-        payload: Optional[Dict[str, Any]] = None,
-        verify: Optional[bool] = None,
+        payload: dict | None = None,
+        verify: bool | None = None,
     ) -> bool:
         """
-        Update Port-Access authentication subresource via PATCH.
-
-        :param authentication_method: 'mac-auth' oder 'dot1x'
-        :param payload: nur die angegebenen Keys werden per PATCH gesetzt
-        :param verify: TLS-Verify; wenn None -> False
-        :return: True bei 2xx
+        Ensure the subresource exists (GET/POST as needed), then PATCH it with the
+        provided payload. Do NOT include 'authentication_method' in the PATCH body.
         """
         if authentication_method not in ("mac-auth", "dot1x"):
             raise ParameterError("authentication_method must be 'mac-auth' or 'dot1x'")
+
+        if not self._ensure_port_access_auth_method(authentication_method, verify=verify):
+            return False
 
         path = (
             f"system/interfaces/{quote_plus(self.name)}/"
             f"port_access_auth_configurations/{authentication_method}"
         )
-
         body = dict(payload or {})
-        # optional (schadet nicht auf manchen Releases):
-        # body.setdefault("authentication_method", authentication_method)
 
         resp = self.session.request(
             "PATCH",
             path,
             data=json.dumps(body),
-            verify=False if verify is None else verify,
+            verify=self.session.s.verify if verify is None else verify,
         )
         return 200 <= resp.status_code < 300
 
 
     def set_mac_auth(self, **kwargs) -> bool:
-        """Wrapper für set_port_access_auth_config('mac-auth', ...)."""
+        """Convenience wrapper for mac-auth."""
         return self.set_port_access_auth_config("mac-auth", payload=kwargs)
 
-
     def set_dot1x(self, **kwargs) -> bool:
-        """Wrapper für set_port_access_auth_config('dot1x', ...)."""
+        """Convenience wrapper for dot1x."""
         return self.set_port_access_auth_config("dot1x", payload=kwargs)

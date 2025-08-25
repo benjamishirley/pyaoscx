@@ -2435,6 +2435,7 @@ class Interface(PyaoscxModule):
         return self.apply()
 
 
+
     # -------------------------------
     # Port-Access Auth (mac-auth / dot1x)
     # -------------------------------
@@ -2442,13 +2443,16 @@ class Interface(PyaoscxModule):
         self,
         authentication_method: str,
         *,
-        payload: Optional[Dict[str, Any]] = None
+        payload: Optional[Dict[str, Any]] = None,
+        verify: Optional[bool] = None,
     ) -> bool:
         """
-        Update Port-Access authentication subresource for this interface via PATCH.
+        Update Port-Access authentication subresource via PATCH.
+
         :param authentication_method: 'mac-auth' oder 'dot1x'
         :param payload: nur die angegebenen Keys werden per PATCH gesetzt
-        :param verify: TLS-Verify; default = Session-Setting
+        :param verify: TLS-Verify; wenn None -> False
+        :return: True bei 2xx
         """
         if authentication_method not in ("mac-auth", "dot1x"):
             raise ParameterError("authentication_method must be 'mac-auth' or 'dot1x'")
@@ -2459,20 +2463,22 @@ class Interface(PyaoscxModule):
         )
 
         body = dict(payload or {})
-        # optional, schadet aber nicht:
+        # optional (schadet nicht auf manchen Releases):
         body.setdefault("authentication_method", authentication_method)
 
         resp = self.session.request(
             "PATCH",
             path,
             data=json.dumps(body),
-            verify=self.session.verify if verify is None else verify,
+            verify=False if verify is None else verify,
         )
         return 200 <= resp.status_code < 300
+
 
     def set_mac_auth(self, **kwargs) -> bool:
         """Wrapper für set_port_access_auth_config('mac-auth', ...)."""
         return self.set_port_access_auth_config("mac-auth", payload=kwargs)
+
 
     def set_dot1x(self, **kwargs) -> bool:
         """Wrapper für set_port_access_auth_config('dot1x', ...)."""

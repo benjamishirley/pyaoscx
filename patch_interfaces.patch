@@ -1,0 +1,74 @@
+diff --git a/pyaoscx/interface.py b/pyaoscx/interface.py
+--- a/pyaoscx/interface.py
++++ b/pyaoscx/interface.py
+@@ -30,6 +30,7 @@ from netaddr.core import AddrFormatError
+ from copy import deepcopy
+ from urllib.parse import quote_plus, unquote_plus
+ from warnings import warn
++from typing import Optional, Dict, Any
+ 
+ ...
+ class Interface(PyaoscxModule):
+@@ -XXXX,0 +XXXX,80 @@
++    # -------------------------------
++    # Port-Access Auth (mac-auth / dot1x)
++    # -------------------------------
++    def set_port_access_auth_config(
++        self,
++        authentication_method: str,
++        *,
++        payload: Optional[Dict[str, Any]] = None,
++        verify: Optional[bool] = None,
++    ) -> bool:
++        """
++        Update Port-Access authentication subresource for this interface via PATCH.
++
++        :param authentication_method: 'mac-auth' or 'dot1x'
++        :param payload: dict with fields to update (only provided keys are changed)
++        :param verify: TLS verification flag; defaults to session default
++        :return: True on 2xx response
++        """
++        if authentication_method not in ("mac-auth", "dot1x"):
++            raise ParameterError("authentication_method must be 'mac-auth' or 'dot1x'")
++
++        # Build resource path (Session.request() will prepend /rest/vX.Y)
++        path = (
++            f"system/interfaces/{quote_plus(self.name)}/"
++            f"port_access_auth_configurations/{authentication_method}"
++        )
++
++        body = dict(payload or {})
++        # Einige AOS-CX Releases erwarten dieses Feld im Body:
++        body.setdefault("authentication_method", authentication_method)
++
++        resp = self.session.request(
++            "PATCH",
++            path,
++            data=json.dumps(body),
++            verify=self.session.verify if verify is None else verify,
++        )
++        # requests.Response.raise_for_status() wäre möglich, aber pyaoscx
++        # bleibt i. d. R. bei bool/Response-Check
++        return 200 <= resp.status_code < 300
++
++    def set_mac_auth(self, **kwargs) -> bool:
++        """
++        Convenience-Wrapper für set_port_access_auth_config('mac-auth', payload=kwargs)
++        Felder z. B.: auth_enable, quiet_period, max_retries, max_requests,
++                      cached_reauth_enable, cached_reauth_period, radius_server_group,
++                      eapol_timeout, initial_auth_response_timeout, macsec_enable,
++                      mka_cak_length, reauth_enable, reauth_period, canned_eap_success_enable,
++                      discovery_period
++        """
++        return self.set_port_access_auth_config("mac-auth", payload=kwargs)
++
++    def set_dot1x(self, **kwargs) -> bool:
++        """
++        Convenience-Wrapper für set_port_access_auth_config('dot1x', payload=kwargs)
++        Felder z. B.: auth_enable, quiet_period, max_retries, max_requests,
++                      cached_reauth_enable, cached_reauth_period, radius_server_group,
++                      eapol_timeout, initial_auth_response_timeout, macsec_enable,
++                      mka_cak_length, reauth_enable, reauth_period, canned_eap_success_enable,
++                      discovery_period
++        """
++        return self.set_port_access_auth_config("dot1x", payload=kwargs)

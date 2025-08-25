@@ -5,6 +5,7 @@ import json
 import logging
 import re
 
+
 from copy import deepcopy
 
 from urllib.parse import quote_plus, unquote_plus
@@ -13,6 +14,8 @@ from warnings import warn
 from netaddr import mac_eui48
 from netaddr import EUI as MacAddress
 from netaddr.core import AddrFormatError
+
+from typing import Optional, Dict, Any
 
 from pyaoscx.exceptions.generic_op_error import GenericOperationError
 from pyaoscx.exceptions.parameter_error import ParameterError
@@ -2426,4 +2429,52 @@ class Interface(PyaoscxModule):
                         "{1}".format(self.name, sw_str_speeds_duplex)
                     )
         self.user_config.update(_user_config)
+        
+
+        
         return self.apply()
+
+
+    # -------------------------------
+    # Port-Access Auth (mac-auth / dot1x)
+    # -------------------------------
+    def set_port_access_auth_config(
+        self,
+        authentication_method: str,
+        *,
+        payload: Optional[Dict[str, Any]] = None,
+        verify: Optional[bool] = None,
+    ) -> bool:
+        """
+        Update Port-Access authentication subresource for this interface via PATCH.
+        :param authentication_method: 'mac-auth' oder 'dot1x'
+        :param payload: nur die angegebenen Keys werden per PATCH gesetzt
+        :param verify: TLS-Verify; default = Session-Setting
+        """
+        if authentication_method not in ("mac-auth", "dot1x"):
+            raise ParameterError("authentication_method must be 'mac-auth' or 'dot1x'")
+
+        path = (
+            f"system/interfaces/{quote_plus(self.name)}/"
+            f"port_access_auth_configurations/{authentication_method}"
+        )
+
+        body = dict(payload or {})
+        # optional, schadet aber nicht:
+        body.setdefault("authentication_method", authentication_method)
+
+        resp = self.session.request(
+            "PATCH",
+            path,
+            data=json.dumps(body),
+            verify=self.session.verify if verify is None else verify,
+        )
+        return 200 <= resp.status_code < 300
+
+    def set_mac_auth(self, **kwargs) -> bool:
+        """Wrapper für set_port_access_auth_config('mac-auth', ...)."""
+        return self.set_port_access_auth_config("mac-auth", payload=kwargs)
+
+    def set_dot1x(self, **kwargs) -> bool:
+        """Wrapper für set_port_access_auth_config('dot1x', ...)."""
+        return self.set_port_access_auth_config("dot1x", payload=kwargs)

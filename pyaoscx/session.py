@@ -341,7 +341,7 @@ class Session:
         """
         Perform a Request to the switch.
 
-        :param operation: type of operation: PUT, GET, POST, DELETE.
+        :param operation: type of operation: PUT, GET, POST, DELETE, PATCH.
         :param path: Path to the resource.
         :param params: Extra request parameters.
         :param data: Data to send in the resquest.
@@ -353,6 +353,7 @@ class Session:
             "GET": self.s.get,
             "POST": self.s.post,
             "DELETE": self.s.delete,
+            "PATCH": self.s.patch,
         }
 
         if operation not in operations:

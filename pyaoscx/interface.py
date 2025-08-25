@@ -2464,7 +2464,7 @@ class Interface(PyaoscxModule):
 
         body = dict(payload or {})
         # optional (schadet nicht auf manchen Releases):
-        body.setdefault("authentication_method", authentication_method)
+        # body.setdefault("authentication_method", authentication_method)
 
         resp = self.session.request(
             "PATCH",

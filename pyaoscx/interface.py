@@ -2442,8 +2442,7 @@ class Interface(PyaoscxModule):
         self,
         authentication_method: str,
         *,
-        payload: Optional[Dict[str, Any]] = None,
-        verify: Optional[bool] = None,
+        payload: Optional[Dict[str, Any]] = None
     ) -> bool:
         """
         Update Port-Access authentication subresource for this interface via PATCH.
